@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:math_expressions/math_expressions.dart';
+import '../models/calculator_model.dart';
 
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
@@ -11,17 +11,17 @@ class CalculatorScreen extends StatefulWidget {
 class _CalculatorScreenState extends State<CalculatorScreen> {
   static const List<String> _buttons = [
     'C',
-    '(',
-    ')',
+    '*',
     '/',
+    '<-',
     '1',
     '2',
     '3',
-    '+',
+    '-',
     '4',
     '5',
     '6',
-    '-',
+    '+',
     '7',
     '8',
     '9',
@@ -33,6 +33,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   ];
 
   String _display = '';
+  double? _firstNum;
+  String? _operator;
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +42,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       appBar: AppBar(
         title: const Text('Calculator App'),
         centerTitle: true,
-        backgroundColor: const Color.fromARGB(255, 0, 0, 0),
+        backgroundColor: const Color.fromARGB(255, 13, 13, 14),
         foregroundColor: Colors.white,
         leading: const BackButton(color: Colors.white),
       ),
@@ -67,7 +69,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             Expanded(
               child: GridView.count(
                 crossAxisCount: 4,
-                mainAxisSpacing: 12,
+                mainAxisSpacing: 13,
                 crossAxisSpacing: 12,
                 childAspectRatio: 0.8,
                 children: [
@@ -76,10 +78,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                       onPressed: () {
                         if (label == 'C') {
                           setState(() => _display = '');
-                          return;
-                        }
-
-                        if (label == '<-') {
+                          _firstNum = null;
+                          _operator = null;
+                        } else if (label == '<-') {
                           if (_display.isNotEmpty) {
                             setState(() {
                               _display = _display.substring(
@@ -88,50 +89,40 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                               );
                             });
                           }
-                          return;
-                        }
-
-                        if (label == '=') {
-                          try {
-                            final expr = _display.replaceAll('%', '/100');
-                            Parser p = Parser();
-                            Expression exp = p.parse(expr);
-                            ContextModel cm = ContextModel();
-                            double eval = exp.evaluate(EvaluationType.REAL, cm);
-                            String result = eval.toString();
-                            if (result.endsWith('.0')) {
-                              result = result.substring(0, result.length - 2);
-                            }
-                            setState(() => _display = result);
-                          } catch (e) {
-                            setState(() => _display = 'Error');
+                        } else if (label == '=') {
+                          if (_firstNum != null &&
+                              _operator != null &&
+                              _display.isNotEmpty) {
+                            final second = double.tryParse(_display) ?? 0;
+                            final result = CalculatorModel().calculate(
+                              _firstNum!,
+                              second,
+                              _operator!,
+                            );
+                            setState(() {
+                              if (result.isNaN) {
+                                _display = 'Error';
+                              } else {
+                                _display = _formatResult(result);
+                              }
+                              _firstNum = null;
+                              _operator = null;
+                            });
                           }
-                          return;
-                        }
-
-                        if ('+-*/%'.contains(label)) {
+                        } else if ('+-*/%'.contains(label)) {
                           if (_display.isEmpty) {
-                            if (label == '-') {
-                              setState(() => _display = '-');
+                            // allow changing operator when first number already set
+                            if (_firstNum != null) {
+                              _operator = label;
                             }
                             return;
                           }
-
-                          final last = _display.characters.last;
-                          if ('+-*/%'.contains(last)) {
-                            setState(() {
-                              _display =
-                                  _display.substring(0, _display.length - 1) +
-                                  label;
-                            });
-                          } else {
-                            setState(() => _display += label);
-                          }
-                          return;
+                          _firstNum = double.tryParse(_display) ?? 0;
+                          _operator = label;
+                          setState(() => _display = '');
+                        } else {
+                          setState(() => _display += label);
                         }
-
-                        // default: numbers, parentheses, dot
-                        setState(() => _display += label);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFEDEDED),
@@ -149,5 +140,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         ),
       ),
     );
+  }
+
+  String _formatResult(double value) {
+    if (value == value.toInt()) {
+      return value.toInt().toString();
+    }
+    return value.toString();
   }
 }
